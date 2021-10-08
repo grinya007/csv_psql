@@ -31,7 +31,7 @@ class Dumper ():
             try:
                 self.dump(task)
             except Exception as e:
-                print(f"Failed to dump {task['table']}: {e}")
+                print(f"Failed to dump {task['tablename']}: {e}")
 
             self.q.task_done()
 

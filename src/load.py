@@ -29,22 +29,30 @@ def simplify_name(fname: str) -> str:
     fname = re.sub('[^a-zA-Z0-9]', '_', fname)
     return fname.lower()
 
-def create_table(conn: connection, tname: str, fields: Series) -> None:
-    if not tname.replace('_', '').isalnum():
-        raise ValueError("table name is unsafe")
+def create_table(conn: connection, fname: str, fields: Series) -> dict:
     
+    tname = simplify_name(fname)
+    names_map = {
+        tname: {
+            'filename': fname,
+            'fields': {}
+        }
+    }
+
     tfields = list()
     for field, ftype in fields.items():
-        field = simplify_name(field)
+        tfield = simplify_name(field)
+        names_map[tname]['fields'][tfield] = field
+
         if ftype.name not in DATA_TYPES:
             raise ValueError(f"{ftype.name} is not supported")
 
-        tfields.append(f'"{field}" {DATA_TYPES[ftype.name]}')
+        tfields.append(f'"{tfield}" {DATA_TYPES[ftype.name]}')
 
     conn.cursor().execute(f"create table {tname} ({','.join(tfields)})")
+    return names_map
 
-
-def load(conn: connection, tname: str, csv_file: Path) -> None:
+def load(conn: connection, csv_file: Path) -> dict:
 
     df = pd.read_csv(csv_file, iterator=True, chunksize=10000)
 
@@ -53,10 +61,12 @@ def load(conn: connection, tname: str, csv_file: Path) -> None:
         if dtypes is None or (chunk.dtypes > dtypes).any():
             dtypes = chunk.dtypes
 
-    create_table(conn, tname, dtypes)
+    names_map = create_table(conn, csv_file.name, dtypes)
 
     with csv_file.open('r') as f:
-        conn.cursor().copy_expert(f"copy {tname} from stdin with header csv", f)
+        conn.cursor().copy_expert(f"copy {list(names_map.keys())[0]} from stdin with header csv", f)
+
+    return names_map
 
 
 if __name__ == "__main__":
@@ -99,12 +109,10 @@ if __name__ == "__main__":
         if not f.name.endswith('.csv'):
             continue
 
-        tname = simplify_name(f.name)
-        tnames[tname] = f.name
-
-        print(f"Loading [{f.name} => {tname}] ... ", flush=True, end='')
+        print(f"Loading [{f.name}] ... ", flush=True, end='')
         t = time()
-        load(conn, tname, f)
+        names_map = load(conn, f)
+        tnames = {**tnames, **names_map}
         print('{:.3f} s'.format(time() - t))
 
     conn.commit()

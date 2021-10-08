@@ -24,5 +24,6 @@ COPY src/* /src
 WORKDIR /src
 
 RUN python load.py --just-compile
+RUN python dump.py --just-compile
 
 CMD ["postgres"]

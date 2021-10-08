@@ -29,20 +29,35 @@ def simplify_name(fname: str) -> str:
     fname = re.sub('[^a-zA-Z0-9]', '_', fname)
     return fname.lower()
 
+def copy_expression(tname: str, fields: Series) -> str:
+    if 'bool' not in fields.values:
+        return tname
+
+    tfields = list()
+    for field, ftype in fields.items():
+        tfield = simplify_name(field)
+        if ftype == 'bool':
+            tfields.append(f'case when "{tfield}" = true then \'True\' else \'False\' end as "{tfield}"')
+        else:
+            tfields.append(f'"{tfield}"')
+
+    return f"(select {','.join(tfields)} from {tname})"
+
+
 def create_table(conn: connection, fname: str, fields: Series) -> dict:
     
     tname = simplify_name(fname)
-    names_map = {
-        tname: {
-            'filename': fname,
-            'fields': {}
-        }
+    meta = {
+        'copy_expr': copy_expression(tname, fields),
+        'tablename': tname,
+        'filename': fname,
+        'fields': []
     }
 
     tfields = list()
     for field, ftype in fields.items():
         tfield = simplify_name(field)
-        names_map[tname]['fields'][tfield] = field
+        meta['fields'].append(field)
 
         if ftype.name not in DATA_TYPES:
             raise ValueError(f"{ftype.name} is not supported")
@@ -50,7 +65,7 @@ def create_table(conn: connection, fname: str, fields: Series) -> dict:
         tfields.append(f'"{tfield}" {DATA_TYPES[ftype.name]}')
 
     conn.cursor().execute(f"create table {tname} ({','.join(tfields)})")
-    return names_map
+    return meta
 
 def load(conn: connection, csv_file: Path) -> dict:
 
@@ -61,12 +76,12 @@ def load(conn: connection, csv_file: Path) -> dict:
         if dtypes is None or (chunk.dtypes > dtypes).any():
             dtypes = chunk.dtypes
 
-    names_map = create_table(conn, csv_file.name, dtypes)
+    meta = create_table(conn, csv_file.name, dtypes)
 
     with csv_file.open('r') as f:
-        conn.cursor().copy_expert(f"copy {list(names_map.keys())[0]} from stdin with header csv", f)
+        conn.cursor().copy_expert(f"copy {meta['tablename']} from stdin with header csv", f)
 
-    return names_map
+    return meta
 
 
 if __name__ == "__main__":
@@ -87,7 +102,7 @@ if __name__ == "__main__":
         help="Database name"
     )
     parser.add_argument(
-        "--tables-dict",
+        "--tables-meta",
         type=str,
         help="Dictionary of table names to file names"
     )
@@ -104,21 +119,19 @@ if __name__ == "__main__":
     # FIXME do I need to create DB at all?
     conn = psycopg2.connect(database=args.db_name, host='localhost', user='postgres')
     
-    tnames = dict()
+    meta = list()
     for f in Path(args.csv_dir).iterdir():
         if not f.name.endswith('.csv'):
             continue
 
         print(f"Loading [{f.name}] ... ", flush=True, end='')
         t = time()
-        names_map = load(conn, f)
-        tnames = {**tnames, **names_map}
+        meta.append(load(conn, f))
         print('{:.3f} s'.format(time() - t))
 
     conn.commit()
     conn.cursor().close()
     conn.close()
 
-    # FIXME will need a way to preserve field names as well
-    with open(args.tables_dict, 'wb') as fp:
-        pickle.dump(tnames, fp)
+    with open(args.tables_meta, 'wb') as fp:
+        pickle.dump(meta, fp)

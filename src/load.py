@@ -30,22 +30,23 @@ def simplify_name(fname: str) -> str:
     return fname.lower()
 
 def copy_expression(tname: str, fields: Series) -> str:
-    if 'bool' not in fields.values:
-        return tname
-
+    has_bool = False
     tfields = list()
     for field, ftype in fields.items():
         tfield = simplify_name(field)
         if ftype == 'bool':
+            has_bool = True
             tfields.append(f'case when "{tfield}" = true then \'True\' else \'False\' end as "{tfield}"')
         else:
             tfields.append(f'"{tfield}"')
 
-    return f"(select {','.join(tfields)} from {tname})"
+    tfields = ','.join(tfields)
+    if has_bool:
+        return f"(select {tfields} from {tname})"
 
+    return f"{tname}({tfields})"
 
 def create_table(conn: connection, fname: str, fields: Series) -> dict:
-    
     tname = simplify_name(fname)
     meta = {
         'copy_expr': copy_expression(tname, fields),
@@ -64,11 +65,10 @@ def create_table(conn: connection, fname: str, fields: Series) -> dict:
 
         tfields.append(f'"{tfield}" {DATA_TYPES[ftype.name]}')
 
-    conn.cursor().execute(f"create table {tname} ({','.join(tfields)})")
+    conn.cursor().execute(f"create table {tname} (id serial, {','.join(tfields)})")
     return meta
 
 def load(conn: connection, csv_file: Path) -> dict:
-
     df = pd.read_csv(csv_file, iterator=True, chunksize=10000)
 
     dtypes = None
@@ -79,7 +79,7 @@ def load(conn: connection, csv_file: Path) -> dict:
     meta = create_table(conn, csv_file.name, dtypes)
 
     with csv_file.open('r') as f:
-        conn.cursor().copy_expert(f"copy {meta['tablename']} from stdin with header csv", f)
+        conn.cursor().copy_expert(f"copy {meta['tablename']}({','.join(meta['fields'])}) from stdin with header csv", f)
 
     return meta
 

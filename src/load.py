@@ -5,10 +5,11 @@ import psycopg2
 import re
 import sys
 
-from time import time
+from time import time, sleep
 from pandas.core.frame import DataFrame
 from pandas.core.series import Series
 from pathlib import Path
+from psycopg2 import OperationalError
 from psycopg2.extensions import connection, ISOLATION_LEVEL_AUTOCOMMIT
 
 DATA_TYPES = {
@@ -110,7 +111,18 @@ if __name__ == "__main__":
     if args.just_compile:
         sys.exit(0)
 
-    conn = psycopg2.connect(host='localhost', user='postgres')
+    # FIXME perhaps there's a better way to get notified when DB is up
+    retries = 10
+    for retry in range(1, retries+1):
+        if retry == retries:
+            # let it die
+            conn = psycopg2.connect(host='localhost', user='postgres')
+        else:
+            try:
+                conn = psycopg2.connect(host='localhost', user='postgres')
+            except OperationalError:
+                sleep(0.2)
+
     conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
     create_db(conn, args.db_name)
     conn.cursor().close()
@@ -118,7 +130,7 @@ if __name__ == "__main__":
 
     # FIXME do I need to create DB at all?
     conn = psycopg2.connect(database=args.db_name, host='localhost', user='postgres')
-    
+
     meta = list()
     for f in Path(args.csv_dir).iterdir():
         if not f.name.endswith('.csv'):

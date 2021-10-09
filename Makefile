@@ -2,7 +2,8 @@ build:
 	docker build -t pg .
 
 run:
-	docker run --rm --name pg -v $(csv_dir):/csv -d pg && \
+	touch $(csv_dir)/psql_history.sql && \
+	docker run --rm --name pg -v $(csv_dir):/csv -v $(csv_dir)/psql_history.sql:/var/lib/postgresql/.psql_history -d pg && \
 	docker exec pg python load.py && \
 	docker exec -it pg psql -U postgres && \
 	docker exec -it pg python dump.py; \

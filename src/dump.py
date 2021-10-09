@@ -1,4 +1,5 @@
 import argparse
+import os
 import pickle
 import psycopg2
 import sys
@@ -9,10 +10,12 @@ from pathlib import Path
 from psycopg2.extensions import connection
 from queue import Queue
 
+CSV_DIR = os.getenv('CSV_DIR')
+TABLES_META = os.getenv('TABLES_META')
 THREADS = 2
 
 class Dumper ():
-    def __init__(self, n_threads: int, conn: tuple):
+    def __init__(self, n_threads: int, conn: dict):
         self.n_threads = n_threads
         self.conn = conn
 
@@ -62,35 +65,33 @@ if __name__ == "__main__":
         help="Don't do actual dump but just compile the script to speedup the first dump",
     )
     parser.add_argument(
-        "--csv-dir",
-        type=str,
-        help="CSV directory"
+        "--no-confirm",
+        action="store_true",
+        help="Skip confirmation",
     )
     parser.add_argument(
-        "--db-name",
+        "--table",
         type=str,
-        help="Database name"
-    )
-    parser.add_argument(
-        "--tables-meta",
-        type=str,
-        help="Tables meta information"
+        help="Dump specific table",
     )
     args = parser.parse_args()
     if args.just_compile:
         sys.exit(0)
 
-    confirm = input('Do you want to dump db? [y/N]: ')
-    if confirm != 'y':
-        sys.exit(0)
+    if not args.no_confirm:
+        confirm = input('Do you want to dump db? [y/N]: ')
+        if confirm != 'y':
+            sys.exit(0)
 
-    dumper = Dumper(THREADS, dict(database=args.db_name, host='localhost', user='postgres'))
+    dumper = Dumper(THREADS, dict(host='localhost', user='postgres'))
 
-    with open(args.tables_meta, 'rb') as fp:
+    with open(TABLES_META, 'rb') as fp:
         tables = pickle.load(fp)
 
     for table in tables:
-        table['file'] = Path(args.csv_dir) / table['filename']
+        if args.table and args.table != table['tablename']:
+            continue
+        table['file'] = Path(CSV_DIR) / table['filename']
         dumper.enque(table)
 
     t = time()

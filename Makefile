@@ -1,19 +1,16 @@
-DB_NAME = csv_db
-TABLES_META = /tmp/tables_meta.pickle
-
 build:
 	docker build -t pg .
 
 run:
-	docker run --rm --name pg -v $(csv_dir):/csv_dir -d pg && \
-	docker exec pg python load.py --csv-dir=/csv_dir --db-name=$(DB_NAME) --tables-meta=$(TABLES_META) && \
-	docker exec -it pg psql -U postgres $(DB_NAME) && \
-	docker exec -it pg python dump.py --csv-dir=/csv_dir --db-name=$(DB_NAME) --tables-meta=$(TABLES_META); \
+	docker run --rm --name pg -v $(csv_dir):/csv -d pg && \
+	docker exec pg python load.py && \
+	docker exec -it pg psql -U postgres && \
+	docker exec -it pg python dump.py; \
 	docker stop pg
 
 run_dev:
-	docker run --rm --name pg -v $(shell /bin/pwd)/src:/src -v $(csv_dir):/csv_dir -d pg && \
-	docker exec pg python load.py --csv-dir=/csv_dir --db-name=$(DB_NAME) --tables-meta=$(TABLES_META) && \
+	docker run --rm --name pg -v $(shell /bin/pwd)/src:/src -v $(csv_dir):/csv -d pg && \
+	docker exec pg python load.py && \
 	docker exec -it pg bash && \
-	docker exec -it pg python dump.py --csv-dir=/csv_dir --db-name=$(DB_NAME) --tables-meta=$(TABLES_META); \
+	docker exec -it pg python dump.py; \
 	docker stop pg

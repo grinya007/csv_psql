@@ -7,6 +7,8 @@ RUN apt-get update && \
 
 RUN ln -s /usr/bin/python3 /usr/bin/python
 
+ENV POSTGRES_HOST_AUTH_METHOD=trust
+
 USER postgres
 RUN initdb
 
@@ -20,7 +22,7 @@ RUN pip install pandas psycopg2-binary
 
 RUN mkdir /csv_dir
 RUN mkdir /src
-COPY src/* /src
+COPY src/* /src/
 WORKDIR /src
 
 RUN python load.py --just-compile

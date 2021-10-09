@@ -85,7 +85,7 @@ if __name__ == "__main__":
         sys.exit(0)
 
     dumper = Dumper(THREADS, dict(database=args.db_name, host='localhost', user='postgres'))
-    
+
     with open(args.tables_meta, 'rb') as fp:
         tables = pickle.load(fp)
 

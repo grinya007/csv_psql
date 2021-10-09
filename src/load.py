@@ -29,21 +29,16 @@ def simplify_name(fname: str) -> str:
     return fname.lower()
 
 def copy_expression(tname: str, fields: Series) -> str:
-    has_bool = False
     tfields = list()
     for field, ftype in fields.items():
         tfield = simplify_name(field)
         if ftype == 'bool':
-            has_bool = True
             tfields.append(f'case when "{tfield}" = true then \'True\' else \'False\' end as "{tfield}"')
         else:
             tfields.append(f'"{tfield}"')
 
     tfields = ','.join(tfields)
-    if has_bool:
-        return f"(select {tfields} from {tname})"
-
-    return f"{tname}({tfields})"
+    return f"(select {tfields} from {tname} order by id)"
 
 def create_table(conn: connection, fname: str, fields: Series) -> dict:
     tname = simplify_name(fname)

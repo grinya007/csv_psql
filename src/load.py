@@ -1,4 +1,5 @@
 import argparse
+import os
 import pandas as pd
 import pickle
 import psycopg2
@@ -10,7 +11,7 @@ from pandas.core.frame import DataFrame
 from pandas.core.series import Series
 from pathlib import Path
 from psycopg2 import OperationalError
-from psycopg2.extensions import connection, ISOLATION_LEVEL_AUTOCOMMIT
+from psycopg2.extensions import connection
 
 DATA_TYPES = {
     'int64': 'int8',
@@ -19,11 +20,8 @@ DATA_TYPES = {
     'object': 'text',
 }
 
-def create_db(conn: connection, db_name: str) -> None:
-    if not db_name.replace('_', '').isalnum():
-        raise ValueError("db_name is unsafe")
-
-    conn.cursor().execute(f"create database {db_name}")
+CSV_DIR = os.getenv('CSV_DIR')
+TABLES_META = os.getenv('TABLES_META')
 
 def simplify_name(fname: str) -> str:
     fname = re.sub('\.csv$', '', fname)
@@ -92,21 +90,6 @@ if __name__ == "__main__":
         action="store_true",
         help="Don't do actual load but just compile the script to speedup the first load",
     )
-    parser.add_argument(
-        "--csv-dir",
-        type=str,
-        help="CSV directory"
-    )
-    parser.add_argument(
-        "--db-name",
-        type=str,
-        help="Database name"
-    )
-    parser.add_argument(
-        "--tables-meta",
-        type=str,
-        help="Dictionary of table names to file names"
-    )
     args = parser.parse_args()
     if args.just_compile:
         sys.exit(0)
@@ -123,16 +106,9 @@ if __name__ == "__main__":
             except OperationalError:
                 sleep(0.2)
 
-    conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
-    create_db(conn, args.db_name)
-    conn.cursor().close()
-    conn.close()
-
-    # FIXME do I need to create DB at all?
-    conn = psycopg2.connect(database=args.db_name, host='localhost', user='postgres')
-
     meta = list()
-    for f in Path(args.csv_dir).iterdir():
+    total_t = time()
+    for f in Path(CSV_DIR).iterdir():
         if not f.name.endswith('.csv'):
             continue
 
@@ -141,9 +117,11 @@ if __name__ == "__main__":
         meta.append(load(conn, f))
         print('{:.3f} s'.format(time() - t))
 
+    print('Done in {:.3f} s'.format(time() - total_t))
+
     conn.commit()
     conn.cursor().close()
     conn.close()
 
-    with open(args.tables_meta, 'wb') as fp:
+    with open(TABLES_META, 'wb') as fp:
         pickle.dump(meta, fp)

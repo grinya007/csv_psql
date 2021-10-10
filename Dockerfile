@@ -28,7 +28,6 @@ ENV EDITOR=vim
 ENV PAGER="less -S"
 ENV PYTHONPYCACHEPREFIX=/tmp
 ENV POSTGRES_HOST_AUTH_METHOD=trust
-ENV POSTGRES_HOME=/var/lib/postgresql
 ENV TABLES_META=/tmp/tables_meta.pickle
 ENV CSV_DIR=/csv
 ENV PIP_TARGET=/pip
@@ -47,8 +46,9 @@ USER postgres
 COPY db/init.sql /docker-entrypoint-initdb.d/
 RUN docker-entrypoint.sh
 
-RUN mkdir -p $POSTGRES_HOME/.config/pgcli
-COPY db/pgcli_config $POSTGRES_HOME/.config/pgcli/config
+USER root
+RUN mkdir -p /root/.config/pgcli
+COPY db/pgcli_config /root/.config/pgcli/config
 
 RUN python load.py --just-compile
 RUN python dump.py --just-compile

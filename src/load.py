@@ -46,13 +46,15 @@ def create_table(conn: connection, fname: str, fields: Series) -> dict:
         'copy_expr': copy_expression(tname, fields),
         'tablename': tname,
         'filename': fname,
-        'fields': []
+        'fields': [],
+        'tablefields': [],
     }
 
     tfields = list()
     for field, ftype in fields.items():
         tfield = simplify_name(field)
         meta['fields'].append(field)
+        meta['tablefields'].append(tfield)
 
         if ftype.name not in DATA_TYPES:
             raise ValueError(f"{ftype.name} is not supported")
@@ -72,8 +74,9 @@ def load(conn: connection, csv_file: Path) -> dict:
 
     meta = create_table(conn, csv_file.name, dtypes)
 
+    fields = ','.join([f'"{f}"' for f in meta['tablefields']])
     with csv_file.open('r') as f:
-        conn.cursor().copy_expert(f"copy {meta['tablename']}({','.join(meta['fields'])}) from stdin with header csv", f)
+        conn.cursor().copy_expert(f"copy {meta['tablename']}({fields}) from stdin with header csv", f)
 
     return meta
 

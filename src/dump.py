@@ -51,8 +51,14 @@ class Dumper ():
         with task['file'].open('w') as f:
             f.write(','.join(task['fields']) + "\n")
             conn.cursor().copy_expert(f"copy {task['copy_expr']} to stdout csv", f)
-            print(f"Done dumping [{task['filename']}]")
+        if task['remove_newline']:
+            with task['file'].open('rb+') as f:
+                f.seek(-1, os.SEEK_END)
+                if f.read(1) == b'\n':
+                    f.seek(-1, os.SEEK_END)
+                    f.truncate()
 
+        print(f"Done dumping [{task['filename']}]")
         conn.cursor().close()
         conn.close()
 

@@ -20,7 +20,8 @@ RUN ln -s /usr/bin/python3 /usr/bin/python
 RUN pip install pgcli
 
 ENV EDITOR=vim
-ENV PAGER="less -S"
+ENV PAGER=less
+ENV LESS="-SRX"
 ENV PYTHONPYCACHEPREFIX=/tmp
 ENV POSTGRES_HOST_AUTH_METHOD=trust
 ENV TABLES_META=/tmp/tables_meta.pickle

@@ -35,8 +35,8 @@ def copy_expression(tname: str, fields: Series) -> str:
         tfield = simplify_name(field)
         if ftype == 'bool':
             tfields.append(
-                f'case when "{tfield}" = true then \'TRUE\''
-                f' else \'FALSE\' end as "{tfield}"'
+                f'case when "{tfield}" = true then \'true\''
+                f' else \'false\' end as "{tfield}"'
             )
         elif ftype == 'float64':
             tfields.append(
@@ -131,7 +131,7 @@ if __name__ == "__main__":
     meta = list()
     total_t = time()
     for f in Path(CSV_DIR).iterdir():
-        if not f.name.endswith('.csv'):
+        if not f.name.endswith('.csv') or f.stat().st_size == 0:
             continue
 
         print(f"Loading [{f.name}] ... ", flush=True, end='')
